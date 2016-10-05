@@ -44,8 +44,8 @@
 #include "dev/sht25.h"
 #include "dev/z1-phidgets.h"
 #include "mqtt-service.h"
+#include "dev/battery-sensor.h"
 #include <msp430.h>
-#include <msp430f2617.h>
 
 #ifdef MOTA_DE_CONTROL
 #define ID_MOTA "linti_control"
@@ -55,11 +55,11 @@
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
 //#define ID_MOTA "linti_cocina"
-#define ID_MOTA "linti_servidores"
-//#define ID_MOTA "linti_oficina_1"
-#define TEMP_ONLY
+//#define ID_MOTA "linti_servidores"
+#define ID_MOTA "linti_oficina_1"
+//#define TEMP_ONLY
 #endif
-#define PERIODO CLOCK_SECOND * 60 * 5
+#define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
 #define DEBUGEAR
 
 // Parece que al ser un sensor de 5v y como la mota tiene un divisor
@@ -94,61 +94,12 @@ static int16_t temperatura=0;
 static int16_t decimas;
 static uint16_t corriente;
 static int16_t movimiento;
-static unsigned int voltaje;
+static uint16_t voltaje;
 
-/*
-* Blocking Delay in Milliseconds
-* delays by at least the specified number of milliseconds (mSec)
-* @pre MCLK = 8MHz
-* @param ms number of milliseconds to delay
-*/
-void delayMs(unsigned int ms)
-{
-  int i;
-  int j;
-    for (i = ms; i; i--)
-    {
-        for (j = CLOCK_SECOND / 1000; j; j--);   //delay "m" mSec
-    }
-}
+uint16_t lectura_voltaje() {
+  uint16_t bateria = battery_sensor.value(0);
 
-/** Private helper method to setup ADC for one-shot conversion and read out
- * value according to registers.
- * Inserts a delay before beginning conversion if REFON
- * @return the raw ADC value with the specified commands.
- * @todo move the VREF warmup to startup and leave on to avoid 17mSec blocking
- * delay each time?
- * */
-unsigned int getAnalogInput(unsigned int adc12ctl0, unsigned int adc12ctl1, unsigned char adc12mctl0)
-{
-#define ADC_VREF_DELAY_MS 17
-	ADC12CTL0 = adc12ctl0;
-	ADC12CTL1 = adc12ctl1;
-	ADC12MCTL0 = adc12mctl0;
-	if (adc12ctl0 & REFON)                    // if internal reference is used...
-		delayMs(ADC_VREF_DELAY_MS);           // 17mSec delay required to Vref capacitors
-	ADC12CTL0 |= ENC;                         // Enable conversions
-	ADC12CTL0 |= ADC12SC;                     // Start conversions
-	while (!(ADC12IFG & 0x01));               // Conversion done?
-	return ADC12MEM0;    // Read out 1st ADC value
-}
-
-/* Measures Vcc to the MSP430, nominally 3.3V
- * - ADC measures VCC/2 compared to 2.5V reference
- *   - If Vcc = 3.3V, ADC output should be (1.65/2.5)*4095 = 2703
- *   - Therefore (halfVcc/2.5)*4095 = ADC reading and (Vcc/2.5)*4095 = 2*ADC
- *   - So Vcc*4096 = 5*ADC and VCC=5*ADC/4095
- *
- *   @return Vcc in millivolts
- *   */
-unsigned int getVcc3()
-{
-	unsigned int ctl0 = REFON + REF2_5V + ADC12ON + SHT0_15;  // turn on 2.5V ref, set samp time=1024 cycles
-	unsigned int ctl1 = SHP;                                  // Use sampling timer, internal ADC12OSC
-	unsigned char mctl0 = SREF_1 + INCH_11;                   // Channel A10, Vcc/2
-	unsigned long vcc = (unsigned long) getAnalogInput(ctl0, ctl1, mctl0);
-	unsigned long mult = vcc * 5000l;
-	return ((unsigned int)(mult / 4096l));
+  return (bateria * 5000l) / 4096l; //Milivolts
 }
 
 /*---------------------------------------------------------------------------*/
@@ -215,7 +166,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     "\"temperature\":%u.%u,"\
     "\"current\":%u,"\
     "\"movement\":%u,"\
-	  "\"voltage\":%u"\
+	"\"voltage\":%u"\
     "}";
   static char mensaje[sizeof(fmt_mensaje) - 8 + 4 + 4 + 1 + 1 + 4];
 
@@ -224,7 +175,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   while(1) {
 
     PROCESS_YIELD();
-
 
     if (etimer_expired(&read_sensors_timer) && mqtt_connected()){
       leds_on(LEDS_GREEN);
@@ -239,17 +189,23 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
       movimiento = phidgets.value(PHIDGET3V_2) > 2000;
 #endif
 
-      voltaje = getVcc3();
+      SENSORS_DEACTIVATE(phidgets); // Desactivo phidgets para
+      SENSORS_ACTIVATE(battery_sensor);
+
+	  voltaje = lectura_voltaje();  // no interferir con el ADC12
+
+	  SENSORS_DEACTIVATE(battery_sensor);
+      SENSORS_ACTIVATE(phidgets);   // que usa lectura_voltaje();
 
       snprintf(mensaje, sizeof(mensaje), fmt_mensaje, temperatura, decimas,
                corriente, movimiento, voltaje);
-      //snprintf(mensaje, 1000, "Hola");
-      mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
+
+	  mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
 #ifdef DEBUGEAR
       static char buf[40];
       ipaddr_sprintf(buf, 40, &uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
       printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
-      printf("Publicando cada %lu segundos\n\r", PERIODO);
+      printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
       puts(mensaje);
 #endif
     }
