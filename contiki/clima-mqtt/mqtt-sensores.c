@@ -46,6 +46,7 @@
 #include "mqtt-service.h"
 #include "dev/battery-sensor.h"
 #include <msp430.h>
+#include "reports.h"
 
 #ifdef MOTA_DE_CONTROL
 #define ID_MOTA "linti_control"
@@ -54,9 +55,9 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-//#define ID_MOTA "linti_cocina"
+#define ID_MOTA "linti_cocina"
 //#define ID_MOTA "linti_servidores"
-#define ID_MOTA "linti_oficina_1"
+//#define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
 #endif
 #define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
@@ -148,6 +149,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   };
 
   PROCESS_BEGIN();
+  REPORT();
   uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
   mqtt_init(in_buffer, sizeof(in_buffer),
             out_buffer, sizeof(out_buffer));
