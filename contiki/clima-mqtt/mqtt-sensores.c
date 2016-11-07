@@ -33,6 +33,7 @@
 #include "rpl/rpl-private.h"
 #include "net/rpl/rpl.h"
 #include "net/ip/uip.h"
+#include "net/ip/uip-debug.h"
 #include "net/ipv6/uip-icmp6.h"
 #include "net/ipv6/sicslowpan.h"
 #include "sys/etimer.h"
@@ -86,134 +87,132 @@
 /*---------------------------------------------------------------------------*/
 #define QUICKSTART "quickstart"
 /*---------------------------------------------------------------------------*/
-static struct etimer publish_periodic_timer;
 static struct etimer read_sensors_timer;
-static struct ctimer ct;
-static char *buf_ptr;
-static int16_t seq_nr_value = 0;
 static int16_t temperatura=0;
-static int16_t decimas;
+static uint16_t decimas;
 static uint16_t corriente;
-static int16_t movimiento;
+static uint16_t movimiento;
 static uint16_t voltaje;
 
-uint16_t lectura_voltaje() {
-  uint16_t bateria = battery_sensor.value(0);
+static char fmt_mensaje[] = "{"\
+                             "\"mote_id\":\"%s\","\
+                             "\"temperature\":%u.%u,"\
+                             "\"current\":%u,"\
+                             "\"movement\":%u,"\
+                             "\"voltage\":%u"\
+                             "}";
+static char mensaje[sizeof(fmt_mensaje) - 8 + 4 + 4 + 1 + 1 + 4];
 
-  return (bateria * 5000l) / 4096l; //Milivolts
+uint16_t lectura_voltaje() {
+    uint16_t bateria = battery_sensor.value(0);
+
+    return (bateria * 5000l) / 4096l; //Milivolts
 }
 
 /*---------------------------------------------------------------------------*/
 PROCESS(mqtt_demo_process, "MQTT Demo");
 AUTOSTART_PROCESSES(&mqtt_demo_process);
 /*---------------------------------------------------------------------------*/
-int ipaddr_sprintf(char *buf, uint8_t buf_len, const uip_ipaddr_t *addr)
-{
-  uint16_t a;
-  uint8_t len = 0;
-  int i, f;
-  for(i = 0, f = 0; i < sizeof(uip_ipaddr_t); i += 2) {
-    a = (addr->u8[i] << 8) + addr->u8[i + 1];
-    if(a == 0 && f >= 0) {
-      if(f++ == 0) {
-        len += snprintf(&buf[len], buf_len - len, "::");
-      }
-    } else {
-      if(f > 0) {
-        f = -1;
-      } else if(i > 0) {
-        len += snprintf(&buf[len], buf_len - len, ":");
-      }
-      len += snprintf(&buf[len], buf_len - len, "%x", a);
-    }
-  }
-  return len;
+
+const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
+    /** Recibe una serie de valores y returna un puntero a una variable global
+     * con el string del mensaje json formado */
+    snprintf(mensaje, sizeof(mensaje), fmt_mensaje, mote_id, temperatura, decimas,
+            corriente, movimiento, voltaje);
+    return mensaje;
+}
+
+void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec){
+    /** Recibe una temperatura en decimas de grado celcius y la descompone en
+     * parte entera (degrees) y decimal (dec) */
+    *dec = temperature % 100;
+    *degrees = (temperature / 100) % 100;
+}
+
+int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov){
+    /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
+     * para no enviar valores fuera de rango a la base de datos */
+    return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
+           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4) &&\
+           (mov == 0 || mov == 1);
 }
 
 PROCESS_THREAD(mqtt_demo_process, ev, data)
 {
-  static uip_ip6addr_t server_address;
-  static uint8_t in_buffer[IN_BUFFER_SIZE];
-  static uint8_t out_buffer[OUT_BUFFER_SIZE];
+    static uip_ip6addr_t server_address;
+    static uint8_t in_buffer[IN_BUFFER_SIZE];
+    static uint8_t out_buffer[OUT_BUFFER_SIZE];
 
-  static mqtt_connect_info_t connect_info = {
-    .client_id = ID_MOTA,
-    .username = NULL,
-    .password = NULL,
-    .will_topic = NULL,
-    .will_message = NULL,
-    .keepalive = 60,
-    .will_qos = 0,
-    .will_retain = 0,
-    .clean_session = 1,
-  };
+    static mqtt_connect_info_t connect_info = {
+        .client_id = ID_MOTA,
+        .username = NULL,
+        .password = NULL,
+        .will_topic = NULL,
+        .will_message = NULL,
+        .keepalive = 60,
+        .will_qos = 0,
+        .will_retain = 0,
+        .clean_session = 1,
+    };
 
-  PROCESS_BEGIN();
-  REPORT();
-  uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
-  mqtt_init(in_buffer, sizeof(in_buffer),
+    PROCESS_BEGIN();
+    REPORT();
+    uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
+    mqtt_init(in_buffer, sizeof(in_buffer),
             out_buffer, sizeof(out_buffer));
-  mqtt_connect(&server_address, UIP_HTONS(1883), 1,
-               &connect_info);
-  PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
+    mqtt_connect(&server_address, UIP_HTONS(1883), 1,
+            &connect_info);
+    PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
 
-  SENSORS_ACTIVATE(sht25); // Temperatura
+    SENSORS_ACTIVATE(sht25); // Temperatura
 #ifndef TEMP_ONLY
-  SENSORS_ACTIVATE(phidgets); // Analógicos (mov y corriente)
+    SENSORS_ACTIVATE(phidgets); // Analógicos (mov y corriente)
 #endif
 
-  printf("MQTT Demo Process\n");
-  static char fmt_mensaje[] = "{"\
-    "\"mote_id\":\"" ID_MOTA "\","\
-    "\"temperature\":%u.%u,"\
-    "\"current\":%u,"\
-    "\"movement\":%u,"\
-	"\"voltage\":%u"\
-    "}";
-  static char mensaje[sizeof(fmt_mensaje) - 8 + 4 + 4 + 1 + 1 + 4];
-
-  etimer_set(&read_sensors_timer, PERIODO);
-
-  while(1) {
-
-    PROCESS_YIELD();
-
-    if (etimer_expired(&read_sensors_timer) && mqtt_connected()){
-      leds_on(LEDS_GREEN);
-      temperatura = sht25.value(SHT25_VAL_TEMP);
-      decimas = temperatura % 100;
-      temperatura = (temperatura / 100) % 100; // Limitado para que de 2 dígitos si o si
-#ifdef TEMP_ONLY
-      corriente = movimiento = 0;
-#else
-      corriente = phidgets.value(PHIDGET5V_1);
-      CURRENT_SENSOR_RELATIVE(corriente);
-      movimiento = phidgets.value(PHIDGET3V_2) > 2000;
-#endif
-
-      SENSORS_DEACTIVATE(phidgets); // Desactivo phidgets para
-      SENSORS_ACTIVATE(battery_sensor);
-
-	  voltaje = lectura_voltaje();  // no interferir con el ADC12
-
-	  SENSORS_DEACTIVATE(battery_sensor);
-      SENSORS_ACTIVATE(phidgets);   // que usa lectura_voltaje();
-
-      snprintf(mensaje, sizeof(mensaje), fmt_mensaje, temperatura, decimas,
-               corriente, movimiento, voltaje);
-
-	  mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
-#ifdef DEBUGEAR
-      static char buf[40];
-      ipaddr_sprintf(buf, 40, &uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
-      printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
-      printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
-      puts(mensaje);
-#endif
-    }
-    leds_off(LEDS_GREEN);
+    printf("MQTT Demo Process\n");
     etimer_set(&read_sensors_timer, PERIODO);
-  }
-  PROCESS_END();
+
+    while(1) {
+
+        PROCESS_YIELD();
+
+        if (etimer_expired(&read_sensors_timer) && mqtt_connected()){
+            leds_on(LEDS_GREEN);
+            temperatura = sht25.value(SHT25_VAL_TEMP);
+            temperature_split(temperatura, &temperatura, &decimas);
+#ifdef TEMP_ONLY
+            corriente = movimiento = 0;
+#else
+            corriente = phidgets.value(PHIDGET5V_1);
+            CURRENT_SENSOR_RELATIVE(corriente);
+            movimiento = phidgets.value(PHIDGET3V_2) > 2000;
+#endif
+
+            SENSORS_DEACTIVATE(phidgets); // Desactivo phidgets para
+            SENSORS_ACTIVATE(battery_sensor);
+
+            voltaje = lectura_voltaje();  // no interferir con el ADC12
+
+            SENSORS_DEACTIVATE(battery_sensor);
+            SENSORS_ACTIVATE(phidgets);   // que usa lectura_voltaje();
+
+            if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
+                format_message(ID_MOTA, temperatura, decimas, corriente, movimiento, voltaje);
+                mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
+            }else{
+                mqtt_publish("linti/ipv6/fueraderango", ID_MOTA, 0, 1);
+            }
+#ifdef DEBUGEAR
+            static char buf[40];
+            uip_debug_ipaddr_print(&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
+            printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
+            printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
+            puts(mensaje);
+#endif
+        }
+        leds_off(LEDS_GREEN);
+        etimer_set(&read_sensors_timer, PERIODO);
+    }
+    PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
