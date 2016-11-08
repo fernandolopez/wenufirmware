@@ -199,7 +199,13 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
                 format_message(ID_MOTA, temperatura, decimas, corriente, movimiento, voltaje);
                 mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
+#ifdef DEBUGEAR
+                puts(mensaje);
+#endif
             }else{
+#ifdef DEBUGEAR
+                puts("Error en el rango de los datos");
+#endif
                 mqtt_publish("linti/ipv6/fueraderango", ID_MOTA, 0, 1);
             }
 #ifdef DEBUGEAR
@@ -207,7 +213,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             uip_debug_ipaddr_print(&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
             printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
             printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
-            puts(mensaje);
 #endif
         }
         leds_off(LEDS_GREEN);
