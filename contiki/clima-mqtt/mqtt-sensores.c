@@ -162,7 +162,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             &connect_info);
     PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
 
-
     mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
 
     SENSORS_ACTIVATE(sht25); // Temperatura
@@ -181,7 +180,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             leds_on(LEDS_GREEN);
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
-	        bateria = battery_sensor.value(0);
+	          bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
 #ifdef TEMP_ONLY
             corriente = movimiento = 0;
@@ -211,15 +210,18 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 #endif
     }
 
+    if (etimer_expired(&read_sensors_timer)){
+      leds_off(LEDS_GREEN);
+      etimer_set(&read_sensors_timer, PERIODO);
+    }
+
     if (mqtt_connected()){
       if (mqtt_event_is_publish(data)){
-          printf("Subscribed!\n");
           printf("%s\n", ((mqtt_event_data_t*)data)->data);
           // Relay the received message to a new topic
       }
     }
-    leds_off(LEDS_GREEN);
-    etimer_set(&read_sensors_timer, PERIODO);
+
   }
   PROCESS_END();
 }
