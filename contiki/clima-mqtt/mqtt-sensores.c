@@ -101,7 +101,7 @@ static char fmt_mensaje[] = "{"\
                              "\"movement\":%u,"\
                              "\"voltage\":%u"\
                              "}";
-static char mensaje[sizeof(fmt_mensaje) - 8 + 4 + 4 + 1 + 1 + 4];
+static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
 
 uint16_t lectura_voltaje() {
     uint16_t bateria = battery_sensor.value(0);
@@ -133,7 +133,7 @@ int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16
     /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
      * para no enviar valores fuera de rango a la base de datos */
     return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
-           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4) &&\
+           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4000) &&\
            (mov == 0 || mov == 1);
 }
 
