@@ -56,7 +56,8 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-#define ID_MOTA "linti_cocina"
+// #define ID_MOTA "linti_cocina"
+#define ID_MOTA "beeeeeeer_plis"
 //#define ID_MOTA "linti_servidores"
 //#define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
@@ -93,6 +94,8 @@ static uint16_t decimas;
 static uint16_t corriente;
 static uint16_t movimiento;
 static uint16_t voltaje;
+static uint16_t bateria;
+
 
 static char fmt_mensaje[] = "{"\
                              "\"mote_id\":\"%s\","\
@@ -103,11 +106,6 @@ static char fmt_mensaje[] = "{"\
                              "}";
 static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
 
-uint16_t lectura_voltaje() {
-    uint16_t bateria = battery_sensor.value(0);
-
-    return (bateria * 5000l) / 4096l; //Milivolts
-}
 
 /*---------------------------------------------------------------------------*/
 PROCESS(mqtt_demo_process, "MQTT Demo");
@@ -164,6 +162,9 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             &connect_info);
     PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
 
+
+    mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
+
     SENSORS_ACTIVATE(sht25); // Temperatura
 #ifndef TEMP_ONLY
     SENSORS_ACTIVATE(phidgets); // Analógicos (mov y corriente)
@@ -180,6 +181,8 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             leds_on(LEDS_GREEN);
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
+	        bateria = battery_sensor.value(0);
+            voltaje = (bateria * 5000l) / 4096l;
 #ifdef TEMP_ONLY
             corriente = movimiento = 0;
 #else
@@ -187,14 +190,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             CURRENT_SENSOR_RELATIVE(corriente);
             movimiento = phidgets.value(PHIDGET3V_2) > 2000;
 #endif
-
-            SENSORS_DEACTIVATE(phidgets); // Desactivo phidgets para
-            SENSORS_ACTIVATE(battery_sensor);
-
-            voltaje = lectura_voltaje();  // no interferir con el ADC12
-
-            SENSORS_DEACTIVATE(battery_sensor);
-            SENSORS_ACTIVATE(phidgets);   // que usa lectura_voltaje();
 
             if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
                 format_message(ID_MOTA, temperatura, decimas, corriente, movimiento, voltaje);
@@ -214,10 +209,18 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
             printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
 #endif
-        }
-        leds_off(LEDS_GREEN);
-        etimer_set(&read_sensors_timer, PERIODO);
     }
-    PROCESS_END();
+
+    if (mqtt_connected()){
+      if (mqtt_event_is_publish(data)){
+          printf("Subscribed!\n");
+          printf("%s\n", ((mqtt_event_data_t*)data)->data);
+          // Relay the received message to a new topic
+      }
+    }
+    leds_off(LEDS_GREEN);
+    etimer_set(&read_sensors_timer, PERIODO);
+  }
+  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
