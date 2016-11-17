@@ -9,7 +9,7 @@ CONTIKI_WITH_IPV6 = 1
 RF_CHANNEL = 26
 WITH_TCP=1
 
-APPS += mqtt-service
+APPS += mqtt-service unit-test
 CONTIKI_SOURCEFILES += sht25.c z1-phidgets.c
 
 all: $(PROJECT)
