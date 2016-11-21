@@ -13,6 +13,8 @@ PROCESS_THREAD(unit_tests_clima_mqtt, ev, data) {
 	PROCESS_BEGIN();
 
 	UNIT_TEST_RUN(format_message_correcto);
+	UNIT_TEST_RUN(temperatura_split_correcto);
+	UNIT_TEST_RUN(validate_correcto);
 
 	PROCESS_END();
 }
