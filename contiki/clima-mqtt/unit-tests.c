@@ -5,7 +5,8 @@
 #include "mqtt-sensores.h"
 
 #define STRING_PRUEBA "string_prueba"
-#define TEMP_PRUEBA 28.13
+#define TEMP_PRUEBA 2813
+// TEMP_INT_PRUEBA Y DEC_PRUEBA deben estar basados en TEMP_PRUEBA
 #define TEMP_INT_PRUEBA 28
 #define DEC_PRUEBA 13
 #define CURR_PRUEBA 3000
@@ -85,9 +86,8 @@ UNIT_TEST(temperatura_split_correcto) {
 	uint16_t decimas_test;
 	temperature_split(temperatura_test, &tempint_test, &decimas_test);
 
-	UNIT_TEST_ASSERT(decimas_test == temperatura_test % 100);
-	// verifica si devuelve dos digitos
-	UNIT_TEST_ASSERT(tempint_test == tempint_test % 100);
+	UNIT_TEST_ASSERT(tempint_test == TEMP_INT_PRUEBA);
+	UNIT_TEST_ASSERT(decimas_test == DEC_PRUEBA);
 
 	UNIT_TEST_END();
 }
