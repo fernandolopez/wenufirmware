@@ -1,5 +1,6 @@
 /* funciones para manejar dispositivo genérico i2c
-(robado bastante de sht25.c) */
+(robado bastante de sht25.c)
+transmit y receive se manejan con 2 y 1 bytes respectivamente */
 #include "i2cmaster.h"
 /*---------------------------------------------------------------------------*/
 static uint8_t enabled = 0;

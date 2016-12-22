@@ -1,7 +1,7 @@
 #include "contiki.h"
 #include "lib/sensors.h"
 #include "dev/sht25.h"
-#include "generico.h"
+#include "i2c-generico-simple.h"
 #include <stdio.h> /* For printf() */
 
 /* afanada tal como está de sht25.c */
