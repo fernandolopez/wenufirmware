@@ -56,10 +56,9 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-// #define ID_MOTA "linti_cocina"
-#define ID_MOTA "beeeeeeer_plis"
-//#define ID_MOTA "linti_servidores"
-//#define ID_MOTA "linti_oficina_1"
+#define ID_MOTA "linti_cocina"
+// #define ID_MOTA "linti_servidores"
+// #define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
 #endif
 #define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
@@ -185,11 +184,12 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             temperature_split(temperatura, &temperatura, &decimas);
 
             SENSORS_DEACTIVATE(phidgets);
-            SENSORS_DEACTIVATE(sht25);
             SENSORS_ACTIVATE(battery_sensor);
 	          bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
             printf("%d\n", voltaje);
+            SENSORS_DEACTIVATE(battery_sensor);
+            SENSORS_ACTIVATE(phidgets);
 
 #ifdef TEMP_ONLY
             corriente = movimiento = 0;
