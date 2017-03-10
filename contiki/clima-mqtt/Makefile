@@ -9,10 +9,16 @@ CONTIKI_WITH_IPV6 = 1
 RF_CHANNEL = 26
 WITH_TCP=1
 
-APPS += mqtt-service unit-test
-CONTIKI_SOURCEFILES += sht25.c z1-phidgets.c
+APPS ?= mqtt-service
+CONTIKI_SOURCEFILES ?= sht25.c z1-phidgets.c
+
 
 all: $(PROJECT)
+
+test:
+	make APPS='mqtt-service unit-test'\
+		 PROJECT_SOURCEFILES='unit-tests.c mqtt-sensores.c sht25.c z1-phidgets.c'\
+		 prueba-unit-tests.z1
 
 CONTIKI?=../../../..
 
