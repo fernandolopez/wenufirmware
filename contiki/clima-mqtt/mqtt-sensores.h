@@ -1,3 +1,6 @@
+#ifndef MQTT_SENSORES_H
+#define MQTT_SENSORES_H
+
 #include "contiki-conf.h"
 #include "contiki.h"
 #include "rpl/rpl-private.h"
@@ -26,8 +29,7 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-// #define ID_MOTA "linti_cocina"
-#define ID_MOTA "beeeeeeer_plis"
+#define ID_MOTA "linti_cocina"
 //#define ID_MOTA "linti_servidores"
 //#define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
@@ -54,49 +56,15 @@
  * datos y falla silenciosamente*/
 #define IN_BUFFER_SIZE 24
 #define OUT_BUFFER_SIZE 128
-/*---------------------------------------------------------------------------*/
+
 /*---------------------------------------------------------------------------*/
 #define QUICKSTART "quickstart"
-/*---------------------------------------------------------------------------*/
-static struct etimer read_sensors_timer;
-static int16_t temperatura=0;
-static uint16_t decimas;
-static uint16_t corriente;
-static uint16_t movimiento;
-static uint16_t voltaje;
-static uint16_t bateria;
-
-
-static char fmt_mensaje[] = "{"\
-                             "\"mote_id\":\"%s\","\
-                             "\"temperature\":%u.%u,"\
-                             "\"current\":%u,"\
-                             "\"movement\":%u,"\
-                             "\"voltage\":%u"\
-                             "}";
-static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
 
 /*---------------------------------------------------------------------------*/
+const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage);
 
-const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
-    /** Recibe una serie de valores y returna un puntero a una variable global
-     * con el string del mensaje json formado */
-    snprintf(mensaje, sizeof(mensaje), fmt_mensaje, mote_id, temp_deg, temp_dec,
-            current, movement, voltage);
-    return mensaje;
-}
+void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec);
 
-void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec){
-    /** Recibe una temperatura en decimas de grado celcius y la descompone en
-     * parte entera (degrees) y decimal (dec) */
-    *dec = temperature % 100;
-    *degrees = (temperature / 100) % 100;
-}
+int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov);
 
-int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov){
-    /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
-     * para no enviar valores fuera de rango a la base de datos */
-    return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
-           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4000) &&\
-           (mov == 0 || mov == 1);
-}
+#endif

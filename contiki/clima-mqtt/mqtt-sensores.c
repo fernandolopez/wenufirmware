@@ -31,6 +31,23 @@
 
 #include "mqtt-sensores.h"
 
+static struct etimer read_sensors_timer;
+static int16_t temperatura=0;
+static uint16_t decimas;
+static uint16_t corriente;
+static uint16_t movimiento;
+static uint16_t voltaje;
+static uint16_t bateria;
+static char fmt_mensaje[] = "{"\
+                             "\"mote_id\":\"%s\","\
+                             "\"temperature\":%u.%u,"\
+                             "\"current\":%u,"\
+                             "\"movement\":%u,"\
+                             "\"voltage\":%u"\
+                             "}";
+
+static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
+
 /*---------------------------------------------------------------------------*/
 PROCESS(mqtt_demo_process, "MQTT Demo");
 AUTOSTART_PROCESSES(&mqtt_demo_process);
@@ -55,12 +72,15 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     };
 
     PROCESS_BEGIN();
-    REPORT();
-    uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
+    REPORT();		
+    uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x201, 0x2ff, 0xfe0e, 0xce94);
+		// nueva ip asignada por cespi en el nuevo server pc
+    // uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
+		// vieja ip estatica
     mqtt_init(in_buffer, sizeof(in_buffer),
-            out_buffer, sizeof(out_buffer));
+              out_buffer, sizeof(out_buffer));
     mqtt_connect(&server_address, UIP_HTONS(1883), 1,
-            &connect_info);
+                 &connect_info);
     PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
 
     mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
@@ -81,8 +101,19 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             leds_on(LEDS_GREEN);
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
+
+#ifndef TEMP_ONLY
+            SENSORS_DEACTIVATE(phidgets);
+#endif
+            SENSORS_ACTIVATE(battery_sensor);
 	          bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
+            printf("%d\n", voltaje);
+            SENSORS_DEACTIVATE(battery_sensor);
+#ifndef TEMP_ONLY
+            SENSORS_ACTIVATE(phidgets);
+#endif
+
 #ifdef TEMP_ONLY
             corriente = movimiento = 0;
 #else
@@ -116,6 +147,12 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
       etimer_set(&read_sensors_timer, PERIODO);
     }
 
+    if (!mqtt_event_is_subscribed(data)){
+      mqtt_subscribe("motaID/accion");
+    }
+
+    printf("%d\n", mqtt_event_is_subscribed(data));
+
     if (mqtt_connected()){
       if (mqtt_event_is_publish(data)){
           printf("%s\n", ((mqtt_event_data_t*)data)->data);
@@ -127,3 +164,26 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+
+const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
+    /** Recibe una serie de valores y returna un puntero a una variable global
+     * con el string del mensaje json formado */
+    snprintf(mensaje, sizeof(mensaje), fmt_mensaje, mote_id, temp_deg, temp_dec,
+            current, movement, voltage);
+    return mensaje;
+}
+
+void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec){
+    /** Recibe una temperatura en decimas de grado celcius y la descompone en
+     * parte entera (degrees) y decimal (dec) */
+    *dec = temperature % 100;
+    *degrees = (temperature / 100) % 100;
+}
+
+int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov){
+    /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
+     * para no enviar valores fuera de rango a la base de datos */
+    return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
+           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4000) &&\
+           (mov == 0 || mov == 1);
+}
