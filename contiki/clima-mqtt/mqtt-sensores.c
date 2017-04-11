@@ -44,10 +44,13 @@
 #include <string.h>
 #include "dev/sht25.h"
 #include "dev/z1-phidgets.h"
-#include "mqtt-service.h"
 #include "dev/battery-sensor.h"
 #include <msp430.h>
 #include "reports.h"
+
+#include "simple-udp.h"
+static struct simple_udp_connection broadcast_connection;
+#define UDP_PORT 5000
 
 #ifdef MOTA_DE_CONTROL
 #define ID_MOTA "linti_control"
@@ -56,12 +59,12 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-#define ID_MOTA "linti_cocina"
-// #define ID_MOTA "linti_servidores"
+//#define ID_MOTA "linti_cocina"
+#define ID_MOTA "linti_servidores"
 // #define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
 #endif
-#define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
+#define PERIODO CLOCK_SECOND * 5 // 5 minutos por reporte.
 #define DEBUGEAR
 
 // Parece que al ser un sensor de 5v y como la mota tiene un divisor
@@ -79,10 +82,6 @@
 #endif
 /*---------------------------------------------------------------------------*/
 
-/* Buffers para MQTT, si el tamaño no es suficiente no transmite los
- * datos y falla silenciosamente*/
-#define IN_BUFFER_SIZE 24
-#define OUT_BUFFER_SIZE 128
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 #define QUICKSTART "quickstart"
@@ -111,6 +110,17 @@ PROCESS(mqtt_demo_process, "MQTT Demo");
 AUTOSTART_PROCESSES(&mqtt_demo_process);
 /*---------------------------------------------------------------------------*/
 
+
+void receiver(struct simple_udp_connection *c,
+        const uip_ipaddr_t *sender_addr,
+        uint16_t sender_port,
+        const uip_ipaddr_t *receiver_addr,
+        uint16_t receiver_port,
+        const uint8_t *data,
+        uint16_t datalen){
+    printf("Recibi: %*s\n", datalen, data);
+}
+
 const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
     /** Recibe una serie de valores y returna un puntero a una variable global
      * con el string del mensaje json formado */
@@ -137,34 +147,15 @@ int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16
 PROCESS_THREAD(mqtt_demo_process, ev, data)
 {
     static uip_ip6addr_t server_address;
-    static uint8_t in_buffer[IN_BUFFER_SIZE];
-    static uint8_t out_buffer[OUT_BUFFER_SIZE];
-
-    static mqtt_connect_info_t connect_info = {
-        .client_id = ID_MOTA,
-        .username = NULL,
-        .password = NULL,
-        .will_topic = NULL,
-        .will_message = NULL,
-        .keepalive = 60,
-        .will_qos = 0,
-        .will_retain = 0,
-        .clean_session = 1,
-    };
 
     PROCESS_BEGIN();
     REPORT();		
-    uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x201, 0x2ff, 0xfe0e, 0xce94);
+    //uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x201, 0x2ff, 0xfe0e, 0xce94);
 		// nueva ip asignada por cespi en el nuevo server pc
     // uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
 		// vieja ip estatica
-    mqtt_init(in_buffer, sizeof(in_buffer),
-              out_buffer, sizeof(out_buffer));
-    mqtt_connect(&server_address, UIP_HTONS(1883), 1,
-                 &connect_info);
-    PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
-
-    mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
+    simple_udp_register(&broadcast_connection, UDP_PORT, NULL, UDP_PORT, receiver);
+    uip_create_linklocal_allnodes_mcast(&server_address);
 
     SENSORS_ACTIVATE(sht25); // Temperatura
 #ifndef TEMP_ONLY
@@ -178,7 +169,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 
         PROCESS_YIELD();
 
-        if (etimer_expired(&read_sensors_timer) && mqtt_connected()){
+        if (etimer_expired(&read_sensors_timer)){
             leds_on(LEDS_GREEN);
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
@@ -201,7 +192,8 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 
             if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
                 format_message(ID_MOTA, temperatura, decimas, corriente, movimiento, voltaje);
-                mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
+                //mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
+                simple_udp_sendto(&broadcast_connection, mensaje, strlen(mensaje), &server_address);
 #ifdef DEBUGEAR
                 puts(mensaje);
 #endif
@@ -209,12 +201,13 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 #ifdef DEBUGEAR
                 puts("Error en el rango de los datos");
 #endif
-                mqtt_publish("linti/ipv6/fueraderango", ID_MOTA, 0, 1);
+                //mqtt_publish("linti/ipv6/fueraderango", ID_MOTA, 0, 1);
+                simple_udp_sendto(&broadcast_connection, "Fuera de rango", 14, &server_address);
             }
 #ifdef DEBUGEAR
             static char buf[40];
             uip_debug_ipaddr_print(&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
-            printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
+            //printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
             printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
 #endif
     }
@@ -224,18 +217,15 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
       etimer_set(&read_sensors_timer, PERIODO);
     }
 
-    if (!mqtt_event_is_subscribed(data)){
-      mqtt_subscribe("motaID/accion");
-    }
 
-    printf("%d\n", mqtt_event_is_subscribed(data));
-
+    /*
     if (mqtt_connected()){
       if (mqtt_event_is_publish(data)){
           printf("%s\n", ((mqtt_event_data_t*)data)->data);
           // Relay the received message to a new topic
       }
     }
+    */
 
   }
   PROCESS_END();

@@ -7,9 +7,8 @@ PROJECT = mqtt-sensores
 CONTIKI_WITH_RPL = 1
 CONTIKI_WITH_IPV6 = 1
 RF_CHANNEL = 26
-WITH_TCP=1
+WITH_TCP=0
 
-APPS += mqtt-service
 CONTIKI_SOURCEFILES += sht25.c z1-phidgets.c
 
 all: $(PROJECT)
