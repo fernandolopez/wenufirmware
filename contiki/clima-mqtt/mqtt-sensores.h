@@ -29,9 +29,9 @@
 // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
 // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
 // Regla de 23: |-----------------------|
-#define ID_MOTA "linti_cocina"
+//#define ID_MOTA "linti_cocina"
 //#define ID_MOTA "linti_servidores"
-//#define ID_MOTA "linti_oficina_1"
+#define ID_MOTA "linti_oficina_1"
 //#define TEMP_ONLY
 #endif
 #define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.

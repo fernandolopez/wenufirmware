@@ -1,5 +1,15 @@
 PROJECT = mqtt-sensores
 
+SOURCES = mqtt-sensores.c\
+	mqtt-sensores.h\
+	project-conf.h\
+	reports.h
+
+TEST_SOURCES = prueba-unit-tests.c\
+	test-strings.c\
+	unit-tests.c\
+	unit-tests.h
+
 -include Makefile.target
 
 # Configuration
@@ -13,9 +23,12 @@ APPS ?= mqtt-service
 CONTIKI_SOURCEFILES ?= sht25.c z1-phidgets.c
 
 
-all: $(PROJECT)
+all:
+	make clean
+	make $(PROJECT).$(TARGET)
+	make $(PROJECT).upload
 
-test:
+test: $(SOURCES) $(TEST_SOURCES)
 	make APPS='mqtt-service unit-test'\
 		 PROJECT_SOURCEFILES='unit-tests.c mqtt-sensores.c sht25.c z1-phidgets.c'\
 		 prueba-unit-tests.z1
