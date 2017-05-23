@@ -28,7 +28,7 @@
 #include <SoftwareSerial.h>
 
 SoftwareSerial mySerial(3, 4); // RX, TX
-String buffer;
+char buffer;
 
 void setup() {
   // set the data rate for the SoftwareSerial port
