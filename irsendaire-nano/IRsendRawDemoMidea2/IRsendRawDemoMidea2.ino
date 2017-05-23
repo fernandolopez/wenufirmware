@@ -24,7 +24,6 @@ IRsend irsend;
 
 void setup()
 {
-
 }
 
 void loop() {
