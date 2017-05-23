@@ -78,20 +78,8 @@
     (measurement) = ((measurement) > 4096)?0:(measurement);\
 } while (0);
 
-/*---------------------------------------------------------------------------*/
-#ifndef BOARD_STRING
-#define BOARD_STRING  "Zolertia Z1 Node"
-#endif
-/*---------------------------------------------------------------------------*/
+#include "mqtt-sensores.h"
 
-/* Buffers para MQTT, si el tamaño no es suficiente no transmite los
- * datos y falla silenciosamente*/
-#define IN_BUFFER_SIZE 24
-#define OUT_BUFFER_SIZE 128
-/*---------------------------------------------------------------------------*/
-/*---------------------------------------------------------------------------*/
-#define QUICKSTART "quickstart"
-/*---------------------------------------------------------------------------*/
 static struct etimer read_sensors_timer;
 static int16_t temperatura=0;
 static uint16_t decimas;
@@ -108,36 +96,13 @@ static char fmt_mensaje[] = "{"\
                              "\"movement\":%u,"\
                              "\"voltage\":%u"\
                              "}";
-static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
 
+static char mensaje[sizeof(fmt_mensaje) - 8 + 23 + 4 + 4 + 1 + 1 + 4];
 
 /*---------------------------------------------------------------------------*/
 PROCESS(mqtt_demo_process, "MQTT Demo");
 AUTOSTART_PROCESSES(&mqtt_demo_process);
 /*---------------------------------------------------------------------------*/
-
-const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
-    /** Recibe una serie de valores y returna un puntero a una variable global
-     * con el string del mensaje json formado */
-    snprintf(mensaje, sizeof(mensaje), fmt_mensaje, mote_id, temperatura, decimas,
-            corriente, movimiento, voltaje);
-    return mensaje;
-}
-
-void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec){
-    /** Recibe una temperatura en decimas de grado celcius y la descompone en
-     * parte entera (degrees) y decimal (dec) */
-    *dec = temperature % 100;
-    *degrees = (temperature / 100) % 100;
-}
-
-int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov){
-    /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
-     * para no enviar valores fuera de rango a la base de datos */
-    return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
-           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4000) &&\
-           (mov == 0 || mov == 1);
-}
 
 PROCESS_THREAD(mqtt_demo_process, ev, data)
 {
@@ -209,13 +174,17 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
 
+#ifndef TEMP_ONLY
             SENSORS_DEACTIVATE(phidgets);
+#endif
             SENSORS_ACTIVATE(battery_sensor);
             bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
             printf("%d\n", voltaje);
             SENSORS_DEACTIVATE(battery_sensor);
+#ifndef TEMP_ONLY
             SENSORS_ACTIVATE(phidgets);
+#endif
 
 #ifdef TEMP_ONLY
             corriente = movimiento = 0;
@@ -262,3 +231,26 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+
+const char *format_message(const char *mote_id, int temp_deg, int temp_dec, int current, int movement, int voltage){
+    /** Recibe una serie de valores y returna un puntero a una variable global
+     * con el string del mensaje json formado */
+    snprintf(mensaje, sizeof(mensaje), fmt_mensaje, mote_id, temp_deg, temp_dec,
+            current, movement, voltage);
+    return mensaje;
+}
+
+void temperature_split(int16_t temperature, int16_t *degrees, uint16_t *dec){
+    /** Recibe una temperatura en decimas de grado celcius y la descompone en
+     * parte entera (degrees) y decimal (dec) */
+    *dec = temperature % 100;
+    *degrees = (temperature / 100) % 100;
+}
+
+int validate(int16_t degrees, uint16_t dec, uint16_t curr, uint16_t volt, uint16_t mov){
+    /** Valida que las lecturas de los sensores (ya procesadas) sean válidas
+     * para no enviar valores fuera de rango a la base de datos */
+    return (degrees > -40 && degrees < 124) && (dec >= 0 && dec <= 99) &&\
+           (curr >= 0 && curr <= 4095) && (volt >= 0 && volt < 4000) &&\
+           (mov == 0 || mov == 1);
+}
