@@ -48,21 +48,26 @@
 #include "dev/battery-sensor.h"
 #include <msp430.h>
 #include "reports.h"
+#include "sys/node-id.h"
 
 #ifdef MOTA_DE_CONTROL
-#define ID_MOTA "linti_control"
 #define TEMP_ONLY
-#else
-// ID para MQTT y para JSON. El estándar MQTT define que el tamaño
-// máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
-// Regla de 23: |-----------------------|
-#define ID_MOTA "linti_cocina"
-// #define ID_MOTA "linti_servidores"
-// #define ID_MOTA "linti_oficina_1"
-//#define TEMP_ONLY
 #endif
+
 #define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
 #define DEBUGEAR
+
+#ifdef DEBUGEAR
+#define DEBUG_STATUS(mote_id) do {\
+            printf("mote_id: %s\n", (mote_id));\
+            printf("IP global: ");\
+            uip_debug_ipaddr_print(&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);\
+            printf("Conectado? %d\n\r", mqtt_connected());\
+            printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);\
+} while(0)
+#else
+#define DEBUG_STATUS(mote_id) ()
+#endif
 
 // Parece que al ser un sensor de 5v y como la mota tiene un divisor
 // de tensión, cuando el sensor está en 0, la mota lee 2100 aproximadamente,
@@ -95,7 +100,7 @@ static uint16_t movimiento;
 static uint16_t voltaje;
 static uint16_t bateria;
 
-
+static const char *mote_id;
 static char fmt_mensaje[] = "{"\
                              "\"mote_id\":\"%s\","\
                              "\"temperature\":%u.%u,"\
@@ -139,9 +144,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     static uip_ip6addr_t server_address;
     static uint8_t in_buffer[IN_BUFFER_SIZE];
     static uint8_t out_buffer[OUT_BUFFER_SIZE];
-
     static mqtt_connect_info_t connect_info = {
-        .client_id = ID_MOTA,
         .username = NULL,
         .password = NULL,
         .will_topic = NULL,
@@ -153,7 +156,30 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     };
 
     PROCESS_BEGIN();
-    REPORT();		
+    REPORT();
+
+    node_id_restore();
+    switch (node_id){
+        case 0x01a4:
+            // ID para MQTT y para JSON. El estándar MQTT define que el tamaño
+            // máximo del ID debe ser 23 bytes, abajo hay 23 "-" como guia.
+            // Regla  |-----------------------|
+            mote_id = "linti_servidores";
+            break;
+        case 0x01a5:
+            mote_id = "linti_cocina";
+            break;
+        case 0x01a6:
+            mote_id = "linti_oficina_1";
+            break;
+        default:
+            mote_id = "default_id";
+    }
+
+    connect_info.client_id = mote_id;
+
+    DEBUG_STATUS(mote_id);
+
     uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x201, 0x2ff, 0xfe0e, 0xce94);
 		// nueva ip asignada por cespi en el nuevo server pc
     // uip_ip6addr(&server_address, 0x2800, 0x340, 0x52, 0x66, 0x2fa3, 0xdbac, 0x4c72, 0x7aa0);
@@ -185,7 +211,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 
             SENSORS_DEACTIVATE(phidgets);
             SENSORS_ACTIVATE(battery_sensor);
-	          bateria = battery_sensor.value(0);
+            bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
             printf("%d\n", voltaje);
             SENSORS_DEACTIVATE(battery_sensor);
@@ -200,7 +226,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 #endif
 
             if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
-                format_message(ID_MOTA, temperatura, decimas, corriente, movimiento, voltaje);
+                format_message(mote_id, temperatura, decimas, corriente, movimiento, voltaje);
                 mqtt_publish("linti/ipv6/temp", mensaje, 0, 1);
 #ifdef DEBUGEAR
                 puts(mensaje);
@@ -209,14 +235,9 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 #ifdef DEBUGEAR
                 puts("Error en el rango de los datos");
 #endif
-                mqtt_publish("linti/ipv6/fueraderango", ID_MOTA, 0, 1);
+                mqtt_publish("linti/ipv6/fueraderango", mote_id, 0, 1);
             }
-#ifdef DEBUGEAR
-            static char buf[40];
-            uip_debug_ipaddr_print(&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
-            printf("IP global %s, Conectado? %d\n\r", buf, mqtt_connected());
-            printf("Publicando cada %lu segundos\n\r", PERIODO / CLOCK_SECOND);
-#endif
+            DEBUG_STATUS(mote_id);
     }
 
     if (etimer_expired(&read_sensors_timer)){
