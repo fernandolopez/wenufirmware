@@ -19,19 +19,15 @@
 
 
 #include <IRremote.h>
-
+#define KHZ 38
 IRsend irsend;
 
-void setup()
-{
-}
+unsigned int irSignal[] = {4400,4350, 550,1600, 550,550, 550,1550, 600,1600, 550,500, 550,550, 550,1600, 550,500, 600,500, 550,1600, 600,500, 550,500, 600,1550, 600,1550, 600,500, 550,1600, 600,450, 600,1600, 550,1550, 600,1600, 550,1600, 550,500, 600,1600, 550,1550, 600,1600, 550,500, 550,550, 550,500, 600,500, 600,1550, 550,550, 550,500, 600,1550, 600,1550, 600,1550, 600,500, 550,550, 550,500, 600,500, 550,500, 600,500, 600,500, 550,500, 600,1550, 600,1550, 600,1550, 600,1550, 600,1550, 600, 4500};  // SAMSUNG B24D7B84
 
+void setup() {}
 void loop() {
-  int khz = 38; // 38kHz carrier frequency for the NEC protocol
-  unsigned int irSignal[] = {4400,4350, 550,1600, 550,550, 550,1550, 600,1600, 550,500, 550,550, 550,1600, 550,500, 600,500, 550,1600, 600,500, 550,500, 600,1550, 600,1550, 600,500, 550,1600, 600,450, 600,1600, 550,1550, 600,1600, 550,1600, 550,500, 600,1600, 550,1550, 600,1600, 550,500, 550,550, 550,500, 600,500, 600,1550, 550,550, 550,500, 600,1550, 600,1550, 600,1550, 600,500, 550,550, 550,500, 600,500, 550,500, 600,500, 600,500, 550,500, 600,1550, 600,1550, 600,1550, 600,1550, 600,1550, 600, 4500};  // SAMSUNG B24D7B84
-  
-  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), khz);
-  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), khz);
+  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), KHZ);
+  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), KHZ);
 
-  delay(2000); //In this example, the signal will be repeated every 5 seconds, approximately.
+  delay(64000);
 }

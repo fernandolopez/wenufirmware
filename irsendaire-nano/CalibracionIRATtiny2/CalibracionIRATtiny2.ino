@@ -9,7 +9,8 @@ char comando;
 
 void setup() {
   mySerial.begin(9600);
-  OSCCAL = 0x7A;  // valor a ojímetro
+//  OSCCAL = 0x00;  // para probar todos los valores
+  OSCCAL = 0x55;  // para ver fácil los dos rangos que funcionan
   mySerial.print("Inicializo OSCCAL = ");
   mySerial.println(OSCCAL, HEX);
 }
