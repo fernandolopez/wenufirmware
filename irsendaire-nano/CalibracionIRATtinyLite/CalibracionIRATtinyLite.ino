@@ -11,30 +11,28 @@ void setup() {
   mySerial.begin(9600);
   // pongo 8E porque es el valor que tira por defecto
 //  OSCCAL = 0x8E;
-  mySerial.print("Inicializo OSCCAL = ");
   mySerial.println(OSCCAL, HEX);
 }
 
 void loop() {
   // cada vez que recibe un caracter
   if (mySerial.available()) {
-    mySerial.print("mySerial.available() = ");
+    mySerial.print("bytes en serial=");
     mySerial.println(mySerial.available());
     // aumenta, decrementa o mantiene igual OSCCAL según caracter enviado
     comando = mySerial.read();
     if (comando == 117) {         // ASCII de "u" de up
       OSCCAL++;
-      mySerial.print("OSCCAL incrementado a ");
     } else if (comando == 100) {  // ASCII de "d" de down
       OSCCAL--;
-      mySerial.print("OSCCAL disminuido a ");
-    } else {
-      mySerial.print("OSCCAL = ");
+    } else if (comando == 115) {  // ASCII de "s" de switch
+      OSCCAL = 0x5F;  // mitad entre 5B y 66 que es un rango en el que funciona bien
     }
+    mySerial.print("OSCCAL=");
     mySerial.print(OSCCAL, HEX);
     // prueba de corrupción de caracteres:
     // (crédito a https://github.com/pepaslabs/CalibrateATtiny85OSCCAL)
-    mySerial.println("UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU.");
+    mySerial.println(" UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU.");
 
     // envía señal IR
     irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), KHZ);
