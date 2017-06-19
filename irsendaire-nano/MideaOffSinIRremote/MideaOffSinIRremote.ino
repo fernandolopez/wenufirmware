@@ -1,35 +1,29 @@
-/* Basado en ejemplo IRsendRawDemo.ino de la librería IRremote */
+/*
+ * Ṕrueba para bypassear IRremote y enviar una señal IR con funciones sencillas propias de Arduino
+ * No funciona con digitalWrite, debe necesitar PWM
+ */
 
-#define TINY 1  // 1 para usar con ATtiny85
-#define SENIAL_MODIF 0
+#define LED_PIN 13
+#define SENIAL_MODIF 1
 // 1 para usar señal modificada (que funciona con los arduinos)
-// 0 para usar señal original dumpeada del remoto
-#define REPETIR 1
-// 1 para agregar 4500 al final de señal original y enviarla 2 veces seguidas (funciona con los arduinos)
-// 0 para enviar señal original dumpeada (no funciona con los arduinos)
-
-#if TINY
-#include <tiny_IRremote.h>
-#else
-#include <IRremote.h>
-#endif
-#define KHZ 38
-IRsend irsend;
-
+// 0 para usar señal original dumpeada del remoto (no funciona con los arduinos)
 #if SENIAL_MODIF
   unsigned int irSignal[] = {4200,4500, 450,1700, 450,600, 500,1650, 500,1650, 450,600, 500,550, 500,1700, 450,600, 450,600, 450,1700, 500,550, 500,550, 450,1700, 450,1700, 500,600, 450,1700, 450,600, 500,1650, 500,1650, 450,1700, 500,1650, 500,600, 450,1700, 450,1700, 450,1700, 450,600, 450,600, 500,550, 450,600, 500,1700, 450,600, 450,600, 450,1700, 450,1700, 500,1650, 450,600, 500,550, 500,600, 450,600, 450,600, 450,600, 500,550, 500,600, 450,1700, 450,1700, 450,1700, 450,1700, 500,1650, 550,4500, 4250,4500, 450,1700, 450,600, 450,1700, 500,1650, 500,550, 450,600, 500,1700, 450,600, 450,600, 500,1650, 500,550, 500,550, 500,1700, 450,1700, 450,600, 500,1650, 500,550, 450,1700, 500,1650, 500,1700, 450,1700, 450,600, 500,1650, 500,1650, 450,1700, 450,600, 500,600, 450,600, 450,600, 500,1650, 500,550, 450,600, 500,1700, 450,1700, 450,1700, 500,550, 500,550, 450,600, 500,600, 450,600, 450,600, 500,550, 500,550, 500,1650, 500,1700, 450,1700, 450,1700, 450,1700, 550};
-#elif REPETIR
-  unsigned int irSignal[] = {4400,4350, 600,1550, 550,550, 550,1600, 550,1600, 550,500, 600,500, 600,1550, 550,550, 550,500, 600,1550, 600,500, 550,550, 550,1550, 600,1600, 550,500, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,500, 600,500, 600,450, 600,500, 600,1550, 600,500, 600,450, 600,1600, 550,1550, 600,1600, 550,500, 550,550, 550,500, 600,500, 600,500, 550,500, 600,500, 550,500, 600,1550, 600,1600, 550,1550, 600,1600, 550,1550, 600,4500};
 #else
   unsigned int irSignal[] = {4400,4350, 600,1550, 550,550, 550,1600, 550,1600, 550,500, 600,500, 600,1550, 550,550, 550,500, 600,1550, 600,500, 550,550, 550,1550, 600,1600, 550,500, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,500, 600,500, 600,450, 600,500, 600,1550, 600,500, 600,450, 600,1600, 550,1550, 600,1600, 550,500, 550,550, 550,500, 600,500, 600,500, 550,500, 600,500, 550,500, 600,1550, 600,1600, 550,1550, 600,1600, 550,1550, 600};
 #endif
+unsigned int size = sizeof(irSignal)/sizeof(irSignal[0]);
 
-void setup() {}
+void setup() {
+  pinMode(LED_PIN, OUTPUT);      // sets the digital pin as output
+}
 void loop() {
-  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), KHZ);
-#if REPETIR
-  irsend.sendRaw(irSignal, sizeof(irSignal)/sizeof(irSignal[0]), KHZ);
-#endif
-
+  for (int i = 0; i < size; i += 2) {
+    digitalWrite(LED_PIN, HIGH);  // LED on (IR mark)
+    delayMicroseconds(irSignal[i]);
+    digitalWrite(LED_PIN, LOW);  // LED off (IR space)
+    delayMicroseconds(irSignal[i+1]);
+  }
+  digitalWrite(LED_PIN, LOW);  // terminar con LED off por las dudas
   delay(1000);
 }
