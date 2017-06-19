@@ -30,6 +30,7 @@ void setup()
   Serial.begin(9600);
   irrecv.enableIRIn(); // Start the receiver
   pinMode(STATUS_PIN, OUTPUT);
+  Serial.println("Bienvenido!");
 }
 
 // Storage for the recorded code
