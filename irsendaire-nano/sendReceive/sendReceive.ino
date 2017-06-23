@@ -1,52 +1,53 @@
-//------------------------------------------------------------------------------
-// Include the IRremote library header
-//
 #include <IRremote.h>
+#define KHZ 38
+#define RECVPIN 11
 
-//------------------------------------------------------------------------------
-// Tell IRremote which Arduino pin is connected to the IR Receiver (TSOP4838)
-//
-int recvPin = 11;
-IRrecv irrecv(recvPin);
-unsigned int rawbuf[] = {4400,4350, 600,1550, 550,550, 550,1600, 550,1600, 550,500, 600,500, 600,1550, 550,550, 550,500, 600,1550, 600,500, 550,550, 550,1550, 600,1600, 550,500, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,1600, 600,500, 550,1600, 550,1600, 550,1600, 550,500, 600,500, 600,450, 600,500, 600,1550, 600,500, 600,450, 600,1600, 550,1550, 600,1600, 550,500, 550,550, 550,500, 600,500, 600,500, 550,500, 600,500, 550,500, 600,1550, 600,1600, 550,1550, 600,1600, 550,1550, 600};
+IRrecv irrecv(RECVPIN);
+decode_results results;
+int rawlen = 0;  // irrecv.resume() hace que results.rawlen = 0, entonces lo copio acá primero
+int i;
 IRsend irsend;
 
-//+=============================================================================
-// Configure the Arduino
-//
-void  setup ( )
-{
-
+void  setup() {
+  irrecv.enableIRIn();
+  Serial.begin(115200);
+  Serial.println("Hello world?");
 }
-//+=============================================================================
-// The repeating section of the code
-//
-void  loop ( )
-{
-  // se usa el pin 3 para enviar
-    irsend.sendRaw(rawbuf, sizeof(rawbuf) / sizeof(rawbuf[0]), 38);
-    irsend.sendRaw(&rawbuf[0], 1, 38);
-    irsend.sendRaw(rawbuf, sizeof(rawbuf) / sizeof(rawbuf[0]), 38);
-
-  Serial.println("Codigo original (no exactamente lo que se envia): ");
-  dumpRaw(rawbuf);
-
+void  loop() {
+  if (irrecv.decode(&results)) {
+    Serial.println("Código recibido!");
+    rawlen = results.rawlen;
+    irrecv.resume();
+    Serial.println("Copiando rawbuf[1] al final de rawbuf");
+    results.rawbuf[rawlen++] = results.rawbuf[1]; // agrega un 4500 al final, incrementa rawlen
+    Serial.println("Procesando valores de rawbuf");
+    for (i = 0; i < rawlen; i++) {
+      results.rawbuf[i] = results.rawbuf[i] * USECPERTICK;
+    }
+    dumpRaw(&results, rawlen);
+    encoding(&results);
+    ircode(&results);
+  }
+  if (rawlen > 1) {
+    Serial.println("Enviando código procesado...");
+    // rawbuf[0] no es parte del código, así que se envía a partir de rawbuf[1]
+    irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+    irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+  } else {
+    Serial.println("Esperando recibir señal IR...");
+  }
   delay(2000);
 }
 
-//+=============================================================================
-// Dump out the decode_results structure.
-//
-void  dumpRaw (unsigned int *rawbuf)
+void  dumpRaw (decode_results *results, unsigned int rawlen)
 {
-  int rawlen = sizeof(rawbuf) / sizeof(rawbuf[0]);
   // Print Raw data
   Serial.print("Timing[");
   Serial.print(rawlen-1, DEC);
   Serial.println("]: ");
 
   for (int i = 1;  i < rawlen;  i++) {
-    unsigned long  x = rawbuf[i]; // * USECPERTICK;
+    unsigned long  x = results->rawbuf[i];  // results->rawbuf[i] * USECPERTICK;
     if (!(i & 1)) {  // even
       Serial.print("-");
       if (x < 1000)  Serial.print(" ") ;
@@ -63,4 +64,42 @@ void  dumpRaw (unsigned int *rawbuf)
     if (!(i % 8))  Serial.println("");
   }
   Serial.println("");                    // Newline
+}
+void  ircode (decode_results *results)
+{
+  Serial.print("Code      : ");
+  // Panasonic has an Address
+  if (results->decode_type == PANASONIC) {
+    Serial.print(results->address, HEX);
+    Serial.print(":");
+  }
+  // Print Code
+  Serial.print(results->value, HEX);
+  Serial.print(" (");
+  Serial.print(results->bits, DEC);
+  Serial.println(" bits)");
+}
+void  encoding (decode_results *results)
+{
+  Serial.print("Encoding  : ");
+  switch (results->decode_type) {
+    default:
+    case UNKNOWN:      Serial.print("UNKNOWN");       break ;
+    case NEC:          Serial.print("NEC");           break ;
+    case SONY:         Serial.print("SONY");          break ;
+    case RC5:          Serial.print("RC5");           break ;
+    case RC6:          Serial.print("RC6");           break ;
+    case DISH:         Serial.print("DISH");          break ;
+    case SHARP:        Serial.print("SHARP");         break ;
+    case JVC:          Serial.print("JVC");           break ;
+    case SANYO:        Serial.print("SANYO");         break ;
+    case MITSUBISHI:   Serial.print("MITSUBISHI");    break ;
+    case SAMSUNG:      Serial.print("SAMSUNG");       break ;
+    case LG:           Serial.print("LG");            break ;
+    case WHYNTER:      Serial.print("WHYNTER");       break ;
+    case AIWA_RC_T501: Serial.print("AIWA_RC_T501");  break ;
+    case PANASONIC:    Serial.print("PANASONIC");     break ;
+    case DENON:        Serial.print("Denon");         break ;
+  }
+  Serial.println("");
 }
