@@ -16,11 +16,15 @@ void  setup() {
 void  loop() {
   if (irrecv.decode(&results)) {
     Serial.println("Código recibido!");
+    Serial.print("rawlen original = ");
+    Serial.println(results.rawlen);
     rawlen = results.rawlen;
     irrecv.resume();
-    Serial.println("Copiando rawbuf[1] al final de rawbuf");
-    results.rawbuf[rawlen++] = results.rawbuf[1]; // agrega un 4500 al final, incrementa rawlen
-    Serial.println("Procesando valores de rawbuf");
+    if (rawlen % 2 == 0) {  // Si rawlen es par, hace falta completar el último par de tiempos
+      Serial.println("rawlen es par. Copiando rawbuf[1] al final de rawbuf, incrementando rawlen");
+      results.rawbuf[rawlen++] = results.rawbuf[1]; // agrega un 4500 al final, incrementa rawlen
+    }
+    Serial.println("Procesando valores de rawbuf...");
     for (i = 0; i < rawlen; i++) {
       results.rawbuf[i] = results.rawbuf[i] * USECPERTICK;
     }
@@ -29,10 +33,22 @@ void  loop() {
     ircode(&results);
   }
   if (rawlen > 1) {
-    Serial.println("Enviando código procesado...");
     // rawbuf[0] no es parte del código, así que se envía a partir de rawbuf[1]
-    irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
-    irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+    if (results.decode_type != NEC) {
+      Serial.println("Enviando código procesado...");
+      irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+      irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+    } else {
+      if (i++ % 2) {
+        Serial.println("Enviando código NEC con sendRaw...");
+        irsend.sendRaw(&results.rawbuf[1], rawlen-1, KHZ);
+      } else {
+        Serial.print("Enviando código NEC con sendNEC (");
+        Serial.print(results.value, HEX);  Serial.print(", ");
+        Serial.print(results.bits, DEC); Serial.println(" bits)");
+        irsend.sendNEC(results.value, results.bits);
+      }
+    }
   } else {
     Serial.println("Esperando recibir señal IR...");
   }
