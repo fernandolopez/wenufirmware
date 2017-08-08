@@ -8,7 +8,8 @@ Conectar sensor IR a RECVPIN (debe ser un pin que acepte interrupciones; ver htt
 #define RECVPIN 2
 #define LEDPIN 13   // 13 suele ser el LED integrado en la placa
 #define maxLen 300
-#define MAXTIEMPOS 16
+#define BITSPORINDICE 4
+#define MAXTIEMPOS (int) pow(2, BITSPORINDICE)
 #define MAXINDICES 200
 #define ROUNDVALUE 50
 #define HALFROUND ROUNDVALUE/2
@@ -18,7 +19,7 @@ volatile unsigned int rawLen = 0;
 uint16_t tiempos[MAXTIEMPOS];
 uint8_t indices[MAXINDICES];
 unsigned int tiemposLen = 0;
-unsigned int indicesLen = 0;
+unsigned int indicesLen;
 
 void setup() {
   attachInterrupt(digitalPinToInterrupt(RECVPIN), rxIR_Interrupt_Handler, CHANGE);
@@ -32,7 +33,7 @@ void setup() {
   Serial.println(F("Código recibido!"));
   detachInterrupt(digitalPinToInterrupt(RECVPIN));
   processAndDump();
-  Serial.println(F("Convirtiendo código..."));
+  Serial.println(F("Codificando señal..."));
   codificacion();
   digitalWrite(LEDPIN, LOW);
 }
@@ -91,45 +92,71 @@ void processAndDump() {
 }
 
 void codificacion() {
-  uint16_t redondo;
-  int i, j;
-  int tiemposOverflow = 0;
+  unsigned int i, j;
   unsigned int tiempoExiste;
 
   // genera tiempos[]
   i = 0;
-  while (i < rawLen && !tiemposOverflow) {
+  while (i < rawLen) {
     // redondeo
-    redondo = round((irBuffer[i] + HALFROUND)/ROUNDVALUE)*ROUNDVALUE;
+    irBuffer[i] = round((irBuffer[i] + HALFROUND)/ROUNDVALUE)*ROUNDVALUE;
 
-    // existe redondo en la lista de tiempos? si no, se agrega
+    // existe el tiempo en la lista de tiempos? si no, se agrega
     tiempoExiste = 0;
     j = 0;
-    while (!tiempoExiste) {
-      tiempoExiste = tiempos[j++] == redondo;
+    while (!tiempoExiste && j < tiemposLen) {
+      tiempoExiste = irBuffer[i] == tiempos[j++];
     }
     if (!tiempoExiste && tiemposLen < MAXTIEMPOS) {
-      tiempos[tiemposLen++] = redondo;
+      tiempos[tiemposLen++] = irBuffer[i];
     } else if (tiemposLen == MAXTIEMPOS) {  // se quiere almacenar un tiempo con tiempos[] lleno
-      tiemposOverflow = true;
+      Serial.println(F("No hay espacio para almacenar todos los tiempos únicos. Modificar ROUNDVALUE si los tiempos son muy similares"));
+      return;
     }
 
     i++;
   }
-  if (tiemposOverflow) {
-    Serial.println(F("No hay espacio para almacenar todos los tiempos únicos. Aumentar MAXTIEMPOS o modificar ROUNDVALUE si los tiempos son muy similares"));
-  } else {
-    Serial.println(F("Tiempos obtenidos..."));
-  }
+  Serial.println(F("Tiempos obtenidos."));
 
   // genera indices[]
-  // cálculo de bits necesarios para almacenar índices
-  
-  if (MAXINDICES < (/* cantidad de valores uint8_t necesarios para almacenar todos los indices */)) {
-    
+  indicesLen = rawLen * BITSPORINDICE / 8;
+  if (indicesLen > MAXINDICES) {
+    Serial.println(F("No hay espacio para almacenar todos los índices"));
   } else {
     for (i = 0; i < rawLen; i++) {
-      
+      j = 0;
+      while ((irBuffer[i/2] != tiempos[j]) && (j < tiemposLen)) j++;
+      if (j == tiemposLen) {
+        Serial.print(F("Error: irBuffer["));
+        Serial.print(i/2);
+        Serial.print(F("] = "));
+        Serial.print(irBuffer[i/2]);
+        Serial.print(F(" no está en tiempos[]"));
+        return;
+      } else {
+        if (!(i % 2)) {  // i es par: almacenar índice en los 4 primeros bits de indices[i/2]
+          indices[i/2] = j;
+        } else {  // i es impar: almacenar índice en los 4 últimos bits de indices[i/2]
+          indices[i/2] += j << 4;
+        }
+      }
     }
   }
+  Serial.println(F("Índices obtenidos."));
+
+  Serial.println(F("Copiá y pegá los siguientes arreglos en el programa del Z1:"));
+  Serial.print(F("static uint16_t tiempos[] = {"));
+  for (i = 0; i < tiemposLen - 1; i++) {
+    Serial.print(tiempos[i]);
+    Serial.print(F(", "));
+  }
+  Serial.print(tiempos[tiemposLen - 1]);
+  Serial.println(F("};"));
+  Serial.print(F("static uint8_t indices[] = {"));
+  for (i = 0; i < indicesLen - 1; i++) {
+    Serial.print(indices[i]);
+    Serial.print(F(", "));
+  }
+  Serial.print(indices[indicesLen - 1]);
+  Serial.println(F("};"));
 }
