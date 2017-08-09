@@ -9,7 +9,7 @@ Conectar sensor IR a RECVPIN (debe ser un pin que acepte interrupciones; ver htt
 #define LEDPIN 13   // 13 suele ser el LED integrado en la placa
 #define maxLen 300
 #define BITSPORINDICE 4
-#define MAXTIEMPOS (int) pow(2, BITSPORINDICE)
+#define MAXTIEMPOS (int) pow(2, BITSPORINDICE) // = 16
 #define MAXINDICES 200
 #define ROUNDVALUE 50
 #define HALFROUND ROUNDVALUE/2
@@ -125,7 +125,7 @@ void codificacion() {
   } else {
     for (i = 0; i < rawLen; i++) {
       j = 0;
-      while ((irBuffer[i/2] != tiempos[j]) && (j < tiemposLen)) j++;
+      while ((irBuffer[i] != tiempos[j]) && (j < tiemposLen)) j++;
       if (j == tiemposLen) {
         Serial.print(F("Error: irBuffer["));
         Serial.print(i/2);
@@ -135,9 +135,9 @@ void codificacion() {
         return;
       } else {
         if (!(i % 2)) {  // i es par: almacenar índice en los 4 primeros bits de indices[i/2]
-          indices[i/2] = j;
+          indices[i/2] = j << 4;
         } else {  // i es impar: almacenar índice en los 4 últimos bits de indices[i/2]
-          indices[i/2] += j << 4;
+          indices[i/2] += j;
         }
       }
     }
