@@ -5,7 +5,17 @@
 Conectar sensor IR a RECVPIN (debe ser un pin que acepte interrupciones; ver https://www.arduino.cc/en/Reference/AttachInterrupt)
 */
 
-#define RECVPIN 2
+#define ESP 1 // 1 para compilar para ESP8266
+
+#ifdef ESP
+  #define RECVPIN 12
+  #define PRENDIDO LOW
+  #define APAGADO HIGH
+#else
+  #define RECVPIN 2
+  #define PRENDIDO HIGH
+  #define APAGADO LOW
+#endif
 #define LEDPIN 13   // 13 suele ser el LED integrado en la placa
 #define maxLen 300
 #define BITSPORINDICE 4
@@ -22,6 +32,10 @@ unsigned int tiemposLen = 0;
 unsigned int indicesLen;
 
 void setup() {
+  #if ESP
+    pinMode(RECVPIN, INPUT);
+    pinMode(LEDPIN, OUTPUT);
+  #endif
   attachInterrupt(digitalPinToInterrupt(RECVPIN), rxIR_Interrupt_Handler, CHANGE);
   Serial.begin(115200);
   Serial.println(F("Hello world?"));
@@ -29,13 +43,13 @@ void setup() {
     Serial.println(F("Esperando señal IR..."));
     delay(3000);
   }
-  digitalWrite(LEDPIN, HIGH);
+  digitalWrite(LEDPIN, PRENDIDO);
   Serial.println(F("Código recibido!"));
   detachInterrupt(digitalPinToInterrupt(RECVPIN));
   processAndDump();
   Serial.println(F("Codificando señal..."));
   codificacion();
-  digitalWrite(LEDPIN, LOW);
+  digitalWrite(LEDPIN, APAGADO);
 }
 
 void loop() {
