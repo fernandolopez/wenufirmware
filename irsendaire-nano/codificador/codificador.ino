@@ -35,6 +35,7 @@ void setup() {
   #if ESP
     pinMode(RECVPIN, INPUT);
     pinMode(LEDPIN, OUTPUT);
+    digitalWrite(LEDPIN, APAGADO);
   #endif
   attachInterrupt(digitalPinToInterrupt(RECVPIN), rxIR_Interrupt_Handler, CHANGE);
   Serial.begin(115200);
