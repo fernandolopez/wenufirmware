@@ -24,9 +24,14 @@
 #define KHZ 38
 IRsend irsend;
 
-#define MASK 0b00001111  // índices de 4 bits
+#if SERIAL  // si no estamos usando serial se puede recibir más indices
+#define MAXINDICES 180
+#else
+#define MAXINDICES 300
+#endif
+#define MASK 0b00001111  // índices de 4 bitsmax
 uint16_t tiempos[16];
-uint8_t indices[100];
+uint8_t indices[MAXINDICES];
 uint16_t tiemposLength, indicesLength;
 unsigned int cantIndices;
 uint8_t buffer[2];
