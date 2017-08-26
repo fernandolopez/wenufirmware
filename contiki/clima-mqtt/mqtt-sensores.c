@@ -54,8 +54,12 @@
 #define TEMP_ONLY
 #endif
 
-#define PERIODO CLOCK_SECOND * 5 * 60 // 5 minutos por reporte.
+#define PERIODO (CLOCK_SECOND * 5 * 60) // 5 minutos por reporte.
+#define ADC_CONVERSION_TICKS 128        // delay para conversión
 #define DEBUGEAR
+
+#define CURRENT_PIN PHIDGET5V_1
+#define MOVEMENT_PIN PHIDGET3V_2
 
 #ifdef DEBUGEAR
 #define DEBUG_STATUS(mote_id) do {\
@@ -81,6 +85,7 @@
 #include "mqtt-sensores.h"
 
 static struct etimer read_sensors_timer;
+static struct etimer conversion_timer;
 static int16_t temperatura=0;
 static uint16_t decimas;
 static uint16_t corriente;
@@ -158,9 +163,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
 
     SENSORS_ACTIVATE(sht25); // Temperatura
-#ifndef TEMP_ONLY
-    SENSORS_ACTIVATE(phidgets); // Analógicos (mov y corriente)
-#endif
 
     printf("MQTT Demo Process\n");
     etimer_set(&read_sensors_timer, PERIODO);
@@ -174,24 +176,24 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             temperatura = sht25.value(SHT25_VAL_TEMP);
             temperature_split(temperatura, &temperatura, &decimas);
 
-#ifndef TEMP_ONLY
-            SENSORS_DEACTIVATE(phidgets);
-#endif
             SENSORS_ACTIVATE(battery_sensor);
+            etimer_set(&conversion_timer, ADC_CONVERSION_TICKS);
+            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&conversion_timer));
             bateria = battery_sensor.value(0);
             voltaje = (bateria * 5000l) / 4096l;
             printf("%d\n", voltaje);
             SENSORS_DEACTIVATE(battery_sensor);
-#ifndef TEMP_ONLY
-            SENSORS_ACTIVATE(phidgets);
-#endif
 
-#ifdef TEMP_ONLY
-            corriente = movimiento = 0;
-#else
-            corriente = phidgets.value(PHIDGET5V_1);
+#ifndef TEMP_ONLY
+            SENSORS_ACTIVATE(phidgets); // Analógicos (mov y corriente)
+            etimer_set(&conversion_timer, ADC_CONVERSION_TICKS);
+            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&conversion_timer));
+            corriente = phidgets.value(CURRENT_PIN);
             CURRENT_SENSOR_RELATIVE(corriente);
-            movimiento = phidgets.value(PHIDGET3V_2) > 2000;
+            movimiento = phidgets.value(MOVEMENT_PIN) > 2000;
+            SENSORS_DEACTIVATE(phidgets);
+#else
+            corriente = movimiento = 0;
 #endif
 
             if (validate(temperatura, decimas, corriente, voltaje, movimiento)){
