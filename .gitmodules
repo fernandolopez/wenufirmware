@@ -1,0 +1,6 @@
+[submodule "lorawan/libraries/arduino-lmic"]
+	path = lorawan/libraries/arduino-lmic
+	url = https://github.com/matthijskooijman/arduino-lmic.git
+[submodule "lorawan/single_chan_pkt_fwd"]
+	path = lorawan/single_chan_pkt_fwd
+	url = https://github.com/tftelkamp/single_chan_pkt_fwd.git
