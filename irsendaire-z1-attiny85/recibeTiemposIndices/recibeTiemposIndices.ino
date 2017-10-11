@@ -9,7 +9,7 @@
 #include <TinyWireS.h>
 #define I2C_SLAVE_ADDR 0x0A
 
-#define SERIAL 1
+//#define SERIAL 1
 #if SERIAL
 # include <SoftwareSerial.h>
   SoftwareSerial Serial(3, 1); // RX, TX
@@ -77,7 +77,7 @@ void  sendRawIndices () {
   irsend.space(0);
 }
 
-void handler(int byteCount) {
+void handler(uint8_t byteCount) {
   uint16_t i;
   tiemposLength = 0;
   indicesLength = 0;

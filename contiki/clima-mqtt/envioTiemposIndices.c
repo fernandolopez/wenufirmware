@@ -17,7 +17,7 @@ ALIMENTAR ATTiny CON 3.3V por las dudas. el attiny aguanta 5v pero el z1 no, sol
 #define I2C_SLAVE_ADDR 0x0A
 #define DELAY(...)	\
 	etimer_set(&et, CLOCK_SECOND/128);	\
-	PROCESS_WAIT_EVENT()
+	PT_YIELD(p)
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
 	(byte & 0x80 ? '1' : '0'), \
@@ -29,14 +29,9 @@ ALIMENTAR ATTiny CON 3.3V por las dudas. el attiny aguanta 5v pero el z1 no, sol
 	(byte & 0x02 ? '1' : '0'), \
 	(byte & 0x01 ? '1' : '0') 
 
-/*---------------------------------------------------------------------------*/
-PROCESS(prueba_i2c_generico, "Climatizacion I2C Master");
-AUTOSTART_PROCESSES(&prueba_i2c_generico);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(prueba_i2c_generico, ev, data)
+PT_THREAD(send_ir_pt(struct pt *p))
 {
-	PROCESS_BEGIN();
-
+    PT_BEGIN(p);
 	/* variables en static para que preserven sus valores en cambios de contexto */
 
 	/* COPIAR Y PEGAR ACÁ ABAJO LOS ARREGLOS OBTENIDOS CON codificador.ino */
@@ -91,6 +86,6 @@ static uint8_t indices[] = {1, 1, 33, 1, 1, 1, 1, 1, 52, 1, 81, 6, 1, 1, 81, 1, 
 	}
 	printf("%u};\n", indices[indicesLength-1]);
 
-	PROCESS_END();
+	PT_END(p);
 }
 /*---------------------------------------------------------------------------*/

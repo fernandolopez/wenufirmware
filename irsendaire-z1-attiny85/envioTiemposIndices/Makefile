@@ -1,4 +1,4 @@
-CONTIKI_PROJECT = climatizacion-i2c-master
+CONTIKI_PROJECT = envioTiemposIndices
 all: $(CONTIKI_PROJECT)
 
 CFLAGS = -I ../../contiki/i2c-generico

@@ -49,6 +49,7 @@
 #include <msp430.h>
 #include "reports.h"
 #include "sys/node-id.h"
+#include "envioTiemposIndices.h"
 
 #ifdef MOTA_DE_CONTROL
 #define TEMP_ONLY
@@ -124,9 +125,12 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
         .will_retain = 0,
         .clean_session = 1,
     };
+    static struct pt send_ir_pt_struct;
 
     PROCESS_BEGIN();
     REPORT();
+
+    PT_INIT(&send_ir_pt_struct);
 
     node_id_restore();
     switch (node_id){
@@ -161,6 +165,7 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     PROCESS_WAIT_EVENT_UNTIL(ev == mqtt_event);
 
     mqtt_subscribe("/motaID/accion"); // La mota se subscribe al topico
+    PT_SCHEDULE(send_ir_pt(&send_ir_pt_struct));
 
     SENSORS_ACTIVATE(sht25); // Temperatura
 

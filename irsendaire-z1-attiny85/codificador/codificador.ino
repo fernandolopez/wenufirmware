@@ -5,7 +5,7 @@
 Conectar sensor IR a RECVPIN (debe ser un pin que acepte interrupciones; ver https://www.arduino.cc/en/Reference/AttachInterrupt)
 */
 
-#define ESP 1 // 1 para compilar para ESP8266, 0 para algún Arduino
+// #define ESP 1 // 1 para compilar para ESP8266, 0 para algún Arduino
 
 #ifdef ESP
   #define RECVPIN 12

@@ -11,6 +11,9 @@ WITH_TCP=1
 
 APPS ?= mqtt-service
 CONTIKI_SOURCEFILES ?= sht25.c z1-phidgets.c
+PROJECT_SOURCEFILES ?= envioTiemposIndices.c
+
+CFLAGS += -I ../../contiki/i2c-generico
 
 
 all: $(PROJECT)
