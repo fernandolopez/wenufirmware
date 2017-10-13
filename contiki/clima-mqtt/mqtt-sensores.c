@@ -171,6 +171,10 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
 
     while(1) {
         PROCESS_YIELD();
+        if (!mqtt_event_is_subscribed(data)){
+            printf("Se subscribe\n");
+            mqtt_subscribe("motaID/accion");
+        }
 
         if (ev == mqtt_event && mqtt_event_is_publish(data) && mqtt_connected()){
             const char* topic = mqtt_event_get_topic(data);
@@ -180,8 +184,9 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             printf("%s = %s\n", topic, message);
 
             process_post_synch(&prueba_i2c_generico, EVENT_SEND_IR, NULL);
-            etimer_set(&send_ir_timer, CLOCK_SECOND);
+            etimer_set(&send_ir_timer, CLOCK_SECOND / 2);
             PROCESS_WAIT_UNTIL(etimer_expired(&send_ir_timer));
+
         }
         else if (!mqtt_connected()) {
             printf("Se perdio un mensaje mqtt por falta de conexion");
