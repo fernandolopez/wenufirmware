@@ -1,0 +1,6 @@
+# stuff "git status" should ignore
+
+*.pyc
+
+# nombres y contraseñas de ttn
+secrets.py
