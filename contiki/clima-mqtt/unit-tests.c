@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+// Is hard to link the main application and unittests, so an ugly hack
+// is to copy mqtt-sensores.c to mqtt-sensores.h and remove the procceses.
 #include "mqtt-sensores.h"
 
 #define STRING_PRUEBA "string_prueba"
@@ -12,48 +14,6 @@
 #define CURR_PRUEBA 3000
 #define MOV_PRUEBA 0
 #define VOLT_PRUEBA 2000
-
-// /*---------------------------------------------------------------------------*/
-
-// UNIT_TEST_REGISTER(temp_rango, "Verificar si la temperatura leida esta en un rango razonable");
-
-// UNIT_TEST(temp_rango) {
-// 	UNIT_TEST_BEGIN();
-
-// 	// rango de temperatura: -40º - 123.8º
-// 	// http://zolertia.sourceforge.net/wiki/index.php/Z1_Sensors#ZIG001_Temperature-Humidity_Sensor
-// 	UNIT_TEST_ASSERT(temperatura >= -40 && temperatura <= 124);
-
-// 	UNIT_TEST_END();
-// }
-
-// /*---------------------------------------------------------------------------*/
-
-// UNIT_TEST_REGISTER(bateria_voltaje_rango, "Verificar si el voltaje leido esta en un rango razonable");
-
-// UNIT_TEST(bateria_voltaje_rango) {
-// 	UNIT_TEST_BEGIN();
-
-// 	// rango de voltaje: -30V - 30V
-// 	// http://www.phidgets.com/products.php?product_id=1117
-// 	UNIT_TEST_ASSERT(voltaje >= -30 && voltaje <= 30);
-
-// 	UNIT_TEST_END();
-// }
-
-// /*---------------------------------------------------------------------------*/
-
-// UNIT_TEST_REGISTER(mov_correcto, "Verificar si el sensor de movimiento es leido correctamente");
-
-// UNIT_TEST(mov_correcto) {
-// 	UNIT_TEST_BEGIN();
-
-// 	UNIT_TEST_ASSERT((movimiento == 0) || (movimiento == 1));
-
-// 	UNIT_TEST_END();
-// }
-
-/*---------------------------------------------------------------------------*/
 
 UNIT_TEST_REGISTER(format_message_correcto, "Verificar si format_message funciona bien");
 
